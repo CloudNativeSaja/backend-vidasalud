@@ -1,0 +1,13 @@
+package cl.duoc.vidasalud.catalog;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class MsVidasaludCatalogApplication {
+
+	public static void main(String[] args) {
+		SpringApplication.run(MsVidasaludCatalogApplication.class, args);
+	}
+
+}

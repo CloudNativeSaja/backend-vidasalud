@@ -1,0 +1,12 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: ms-vidasalud-bff
+
+services:
+  appointments:
+    url: http://localhost:8081
+  catalog:
+    url: http://localhost:8082
