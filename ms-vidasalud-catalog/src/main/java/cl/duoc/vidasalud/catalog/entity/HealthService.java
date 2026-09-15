@@ -9,15 +9,7 @@ import jakarta.persistence.*;
 public class HealthService {
 
     @Id
-    @GeneratedValue(
-        strategy = GenerationType.SEQUENCE,
-        generator = "health_service_seq"
-    )
-    @SequenceGenerator(
-        name = "health_service_seq",
-        sequenceName = "VS_HEALTH_SERVICE_SEQ",
-        allocationSize = 1
-    )
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @Column(nullable = false, length = 120)

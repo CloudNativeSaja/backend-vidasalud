@@ -10,15 +10,7 @@ import jakarta.persistence.*;
 public class Appointment {
 
     @Id
-    @GeneratedValue(
-        strategy = GenerationType.SEQUENCE,
-        generator = "appointment_seq"
-    )
-    @SequenceGenerator(
-        name = "appointment_seq",
-        sequenceName = "VS_APPOINTMENT_SEQ",
-        allocationSize = 1
-    )
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @Column(nullable = false)

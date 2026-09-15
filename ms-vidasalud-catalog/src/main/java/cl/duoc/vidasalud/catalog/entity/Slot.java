@@ -9,15 +9,7 @@ import jakarta.persistence.*;
 public class Slot {
 
     @Id
-    @GeneratedValue(
-        strategy = GenerationType.SEQUENCE,
-        generator = "slot_seq"
-    )
-    @SequenceGenerator(
-        name = "slot_seq",
-        sequenceName = "VS_SLOT_SEQ",
-        allocationSize = 1
-    )
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @ManyToOne(optional = false)

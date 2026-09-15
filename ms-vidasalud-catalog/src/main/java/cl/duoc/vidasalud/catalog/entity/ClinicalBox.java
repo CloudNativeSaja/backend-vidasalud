@@ -7,15 +7,7 @@ import jakarta.persistence.*;
 public class ClinicalBox {
 
     @Id
-    @GeneratedValue(
-        strategy = GenerationType.SEQUENCE,
-        generator = "clinical_box_seq"
-    )
-    @SequenceGenerator(
-        name = "clinical_box_seq",
-        sequenceName = "VS_CLINICAL_BOX_SEQ",
-        allocationSize = 1
-    )
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @Column(nullable = false, length = 100)
