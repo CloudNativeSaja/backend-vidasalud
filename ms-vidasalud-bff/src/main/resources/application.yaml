@@ -5,8 +5,19 @@ spring:
   application:
     name: ms-vidasalud-bff
 
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${AZURE_ISSUER:https://login.microsoftonline.com/9856cc68-d10d-4037-8c16-eef696ff0bbe/v2.0}
+
+security:
+  jwt:
+    audience: ${AZURE_AUDIENCE:87836a5b-acbe-48cb-8154-37e25612d06b}
+
 services:
   appointments:
-    url: http://localhost:8081
+    url: ${APPOINTMENTS_URL:http://localhost:8081}
+
   catalog:
-    url: http://localhost:8082
+    url: ${CATALOG_URL:http://localhost:8082}
