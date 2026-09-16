@@ -16,8 +16,9 @@ security:
     audience: ${AZURE_AUDIENCE:87836a5b-acbe-48cb-8154-37e25612d06b}
 
 services:
+
   appointments:
-    url: ${APPOINTMENTS_URL:http://localhost:8081}
+    url: ${APPOINTMENTS_URL:http://127.0.0.1:8081}
 
   catalog:
-    url: ${CATALOG_URL:http://localhost:8082}
+    url: ${CATALOG_URL:http://127.0.0.1:8082}
