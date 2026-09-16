@@ -1,36 +1,75 @@
 package cl.duoc.vidasalud.bff.config;
 
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.config.Customizer;
+import org.springframework.http.HttpMethod;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+
 import org.springframework.security.web.SecurityFilterChain;
 
+import org.springframework.security.config.http.SessionCreationPolicy;
+
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+
+
+
 @Configuration
+@EnableMethodSecurity
 public class SecurityConfig {
 
-    @Bean
-    public SecurityFilterChain securityFilterChain(
-            HttpSecurity http) throws Exception {
 
-        http
-            .csrf(csrf -> csrf.disable())
+    private final JwtRoleConverter jwtRoleConverter;
 
-            .cors(Customizer.withDefaults())
 
-            .authorizeHttpRequests(auth -> auth
+    public SecurityConfig(
+            JwtRoleConverter jwtRoleConverter
+    ) {
 
-                .requestMatchers("/api/bff/**")
-                .hasAuthority("SCOPE_access_as_user")
+        this.jwtRoleConverter = jwtRoleConverter;
 
-                .anyRequest()
-                .authenticated()
-            )
-
-            .oauth2ResourceServer(oauth2 ->
-                oauth2.jwt(Customizer.withDefaults())
-            );
-
-        return http.build();
     }
+
+
+
+    @Bean
+    SecurityFilterChain securityFilterChain(
+            HttpSecurity http
+    ) throws Exception {
+
+
+
+return http
+
+    .cors(cors -> {})
+
+    .csrf(csrf -> csrf.disable())
+
+    .authorizeHttpRequests(auth -> auth
+
+        .requestMatchers("/actuator/health")
+        .permitAll()
+
+        .requestMatchers(HttpMethod.OPTIONS,"/**")
+        .permitAll()
+
+        .anyRequest()
+        .authenticated()
+
+    )
+
+    .oauth2ResourceServer(
+        oauth2 -> oauth2
+            .jwt(jwt ->
+                jwt.jwtAuthenticationConverter(
+                    jwtRoleConverter
+                )
+            )
+    )
+
+    .build();
+
+    }
+
 }
