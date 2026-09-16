@@ -1,20 +1,30 @@
 server:
-  port: 8082
+  port: ${CATALOG_PORT:8082}
 
 spring:
+
   application:
     name: ms-vidasalud-catalog
 
+
   datasource:
-    url: ${CATALOG_DB_URL:jdbc:mysql://localhost:3306/vidasalud_catalog?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Santiago}
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
+
+    url: ${CATALOG_DB_URL:jdbc:mysql://127.0.0.1:3306/vidasalud_catalog?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Santiago}
+
+    username: ${DB_USERNAME:root}
+
+    password: ${DB_PASSWORD:123456}
+
     driver-class-name: com.mysql.cj.jdbc.Driver
 
+
   jpa:
+
     hibernate:
       ddl-auto: update
+
     show-sql: true
+
     properties:
       hibernate:
         format_sql: true
