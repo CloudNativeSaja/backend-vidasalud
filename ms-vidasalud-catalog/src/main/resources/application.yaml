@@ -6,17 +6,15 @@ spring:
   application:
     name: ms-vidasalud-catalog
 
-
   datasource:
 
-    url: ${CATALOG_DB_URL:jdbc:mysql://127.0.0.1:3306/vidasalud_catalog?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Santiago}
+    url: ${CATALOG_DB_URL:jdbc:mariadb://127.0.0.1:3306/vidasalud_catalog?useSSL=false&serverTimezone=America/Santiago}
 
     username: ${DB_USERNAME:root}
 
     password: ${DB_PASSWORD:123456}
 
-    driver-class-name: com.mysql.cj.jdbc.Driver
-
+    driver-class-name: org.mariadb.jdbc.Driver
 
   jpa:
 
