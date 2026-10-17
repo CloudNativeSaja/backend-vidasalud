@@ -12,6 +12,7 @@ import cl.duoc.vidasalud.appointments.entity.Appointment;
 import cl.duoc.vidasalud.appointments.enums.AppointmentStatus;
 import cl.duoc.vidasalud.appointments.exception.BusinessRuleException;
 import cl.duoc.vidasalud.appointments.exception.ResourceNotFoundException;
+import cl.duoc.vidasalud.appointments.notification.AppointmentNotifier;
 import cl.duoc.vidasalud.appointments.repository.AppointmentRepository;
 
 @Service
@@ -19,9 +20,14 @@ public class AppointmentService {
 
     private final AppointmentRepository repository;
 
+    // Puerto de salida: avisa los cambios de la atencion (implementado con RabbitMQ)
+    private final AppointmentNotifier notifier;
+
     public AppointmentService(
-            AppointmentRepository repository) {
+            AppointmentRepository repository,
+            AppointmentNotifier notifier) {
         this.repository = repository;
+        this.notifier = notifier;
     }
 
     // CREATE
@@ -40,9 +46,12 @@ public class AppointmentService {
             AppointmentStatus.SOLICITADA
         );
 
-        return toResponse(
-            repository.save(appointment)
-        );
+        Appointment saved = repository.save(appointment);
+
+        // Comando asincrono: email "solicitud recibida"
+        notifier.appointmentCreated(saved);
+
+        return toResponse(saved);
     }
 
     // READ - TODOS / FILTROS
@@ -145,16 +154,22 @@ public class AppointmentService {
         Appointment appointment =
             getAppointment(id);
 
+        AppointmentStatus previousStatus =
+            appointment.getStatus();
+
         validateStatusTransition(
-            appointment.getStatus(),
+            previousStatus,
             newStatus
         );
 
         appointment.setStatus(newStatus);
 
-        return toResponse(
-            repository.save(appointment)
-        );
+        Appointment saved = repository.save(appointment);
+
+        // Comandos asincronos segun el nuevo estado (email, ticket, documento)
+        notifier.statusChanged(saved, previousStatus);
+
+        return toResponse(saved);
     }
 
     // DELETE
