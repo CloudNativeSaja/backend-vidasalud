@@ -1,0 +1,124 @@
+# VidaSalud - backend (BFF + appointments + catalog + MariaDB)
+#
+#   cp .env.example .env     # y editar las contrasenas
+#   docker compose up -d --build
+#   docker compose ps
+#
+# Solo el BFF (8080) se publica hacia afuera, y es el unico destino del API Gateway.
+# appointments y catalog quedan en la red interna; sus puertos solo se abren en
+# 127.0.0.1 para poder hacer pruebas con curl desde la propia maquina.
+name: vidasalud-back
+
+x-java-service: &java-service
+  restart: unless-stopped
+  networks:
+    - back-net
+
+services:
+
+  mariadb:
+    image: mariadb:11.4
+    container_name: vidasalud-mariadb
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?Falta DB_ROOT_PASSWORD en .env}
+      MARIADB_USER: ${DB_USERNAME:?Falta DB_USERNAME en .env}
+      MARIADB_PASSWORD: ${DB_PASSWORD:?Falta DB_PASSWORD en .env}
+      TZ: America/Santiago
+    command: ["--innodb-buffer-pool-size=128M", "--max-connections=60"]
+    volumes:
+      - mariadb-data:/var/lib/mysql
+      - ./docker/mariadb/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    mem_limit: 512m
+    networks:
+      - back-net
+
+  appointments:
+    <<: *java-service
+    build: ./ms-vidasalud-appointments
+    image: vidasalud/appointments:local
+    container_name: vidasalud-appointments
+    environment:
+      APPOINTMENTS_PORT: 8081
+      APPOINTMENTS_DB_URL: jdbc:mariadb://mariadb:3306/vidasalud_appointments?useSSL=false&serverTimezone=America/Santiago
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      SPRING_JPA_SHOW_SQL: "false"
+      TZ: America/Santiago
+    ports:
+      - "127.0.0.1:8081:8081"
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8081/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    mem_limit: 384m
+
+  catalog:
+    <<: *java-service
+    build: ./ms-vidasalud-catalog
+    image: vidasalud/catalog:local
+    container_name: vidasalud-catalog
+    environment:
+      CATALOG_PORT: 8082
+      CATALOG_DB_URL: jdbc:mariadb://mariadb:3306/vidasalud_catalog?useSSL=false&serverTimezone=America/Santiago
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      SPRING_JPA_SHOW_SQL: "false"
+      TZ: America/Santiago
+    ports:
+      - "127.0.0.1:8082:8082"
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8082/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    mem_limit: 384m
+
+  bff:
+    <<: *java-service
+    build: ./ms-vidasalud-bff
+    image: vidasalud/bff:local
+    container_name: vidasalud-bff
+    environment:
+      BFF_PORT: 8080
+      AZURE_ISSUER: ${AZURE_ISSUER}
+      AZURE_AUDIENCE: ${AZURE_AUDIENCE}
+      APPOINTMENTS_URL: http://appointments:8081
+      CATALOG_URL: http://catalog:8082
+      TZ: America/Santiago
+    ports:
+      - "8080:8080"
+    depends_on:
+      appointments:
+        condition: service_healthy
+      catalog:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    mem_limit: 384m
+
+networks:
+  back-net:
+    name: vidasalud-back-net
+
+volumes:
+  mariadb-data:
