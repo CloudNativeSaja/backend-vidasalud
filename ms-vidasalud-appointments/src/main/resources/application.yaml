@@ -20,3 +20,40 @@ spring:
     properties:
       hibernate:
         format_sql: true
+
+  rabbitmq:
+    # Cluster de 2 nodos: la app se conecta al primero disponible
+    addresses: ${RABBITMQ_ADDRESSES:localhost:5672,localhost:5673}
+    username: ${RABBITMQ_USER:vidasalud}
+    password: ${RABBITMQ_PASSWORD:vidasalud}
+    virtual-host: /
+    # Si RabbitMQ no responde, se falla rapido y la cita igual se guarda
+    connection-timeout: 3s
+    # Publisher confirms: el broker confirma (ack/nack) cada mensaje publicado
+    publisher-confirm-type: correlated
+    # Publisher returns: avisa si un mensaje no tuvo ninguna cola de destino
+    publisher-returns: true
+
+# =====================================================================
+# Configuracion centralizada de mensajeria (unica fuente de nombres)
+# Mismo prefijo "vidasalud.messaging" en todos los microservicios.
+# =====================================================================
+vidasalud:
+  messaging:
+    # false = no se publican comandos (la API funciona igual)
+    enabled: ${MESSAGING_ENABLED:true}
+    source: ms-vidasalud-appointments
+    exchanges:
+      direct: cmd.direct
+      topic: cmd.topic
+    # Routing keys con que este productor publica cada comando
+    publishing:
+      email-send: email.send                # direct -> q.cmd.email
+      email-requested: email.requested      # topic (email.*) -> q.cmd.email
+      email-called: email.called            # topic (email.*) -> q.cmd.email
+      email-closed: email.closed            # topic (email.*) -> q.cmd.email
+      email-cancelled: email.cancelled      # topic (email.*) -> q.cmd.email
+      admission-ticket: admission.ticket    # direct -> q.cmd.admission
+      admission-call: admission.call.box    # topic (admission.#) -> q.cmd.admission
+      record-gen: record.gen                # direct -> q.cmd.record
+      record-summary: record.summary        # topic (record.*) -> q.cmd.record

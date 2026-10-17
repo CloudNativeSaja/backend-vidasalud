@@ -1,0 +1,82 @@
+server:
+  port: ${NOTIFY_PORT:8084}
+
+spring:
+  application:
+    name: ms-vidasalud-notify
+
+  rabbitmq:
+    # Cluster de 2 nodos: la app se conecta al primero disponible
+    addresses: ${RABBITMQ_ADDRESSES:localhost:5672,localhost:5673}
+    username: ${RABBITMQ_USER:vidasalud}
+    password: ${RABBITMQ_PASSWORD:vidasalud}
+    virtual-host: /
+    connection-timeout: 5s
+    listener:
+      simple:
+        # ACK manual: cada consumidor decide ACK / reintento / NACK -> DLQ
+        acknowledge-mode: manual
+        # Fair dispatch: un mensaje sin confirmar por consumidor
+        prefetch: 1
+        concurrency: 1
+        max-concurrency: 3
+        # Red de seguridad: un rechazo nunca se re-encola en loop
+        default-requeue-rejected: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+# =====================================================================
+# Configuracion centralizada de mensajeria (unica fuente de nombres)
+# Mismo prefijo "vidasalud.messaging" en todos los microservicios.
+# =====================================================================
+vidasalud:
+  messaging:
+    exchanges:
+      direct: cmd.direct          # comandos punto a punto (routing key exacta)
+      topic: cmd.topic            # comandos por patron (* / #)
+      dead-letter: cmd.dead.dlx   # DLX: recibe los mensajes rechazados
+    # classic | quorum (quorum replica la cola en los 2 nodos del cluster)
+    queue-type: classic
+    # Politica de retencion: los mensajes en DLQ se conservan 7 dias
+    dlq-retention-ms: 604800000
+    routes:
+      email:
+        queue: q.cmd.email
+        dlq: q.cmd.email.dlq
+        direct-key: email.send
+        topic-pattern: "email.*"
+        dead-letter-key: q.cmd.email.dlq
+      admission:
+        queue: q.cmd.admission
+        dlq: q.cmd.admission.dlq
+        direct-key: admission.ticket
+        topic-pattern: "admission.#"
+        dead-letter-key: q.cmd.admission.dlq
+      record:
+        queue: q.cmd.record
+        dlq: q.cmd.record.dlq
+        direct-key: record.gen
+        topic-pattern: "record.*"
+        dead-letter-key: q.cmd.record.dlq
+    consumer:
+      # Intentos totales antes de enviar a la DLQ (errores recuperables)
+      max-attempts: 3
+      # Espera base entre reintentos (se multiplica por el numero de intento)
+      retry-delay-ms: 1000
+      # Cantidad de eventId recordados para idempotencia
+      idempotency-cache-size: 10000
+
+  notify:
+    # Fallos simulados para la demo: si el patientId contiene el marcador,
+    # el consumidor falla de forma recuperable (reintenta) o permanente (DLQ directo)
+    simulation:
+      enabled: ${NOTIFY_SIMULATION_ENABLED:true}
+      transient-failure-marker: FALLA-TEMPORAL
+      permanent-failure-marker: FALLA-PERMANENTE
