@@ -160,8 +160,10 @@ services:
         condition: service_healthy
       catalog:
         condition: service_healthy
+    # El BFF solo deja pasar /actuator/health sin token (SecurityConfig), por eso no usa /liveness.
+    # No depende de RabbitMQ, asi que el health completo no se ve afectado por la mensajeria.
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/actuator/health/liveness"]
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/actuator/health"]
       interval: 15s
       timeout: 5s
       retries: 10
