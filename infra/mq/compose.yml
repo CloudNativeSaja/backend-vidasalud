@@ -1,0 +1,72 @@
+# =====================================================================
+# VidaSalud - RabbitMQ en cluster de 2 nodos (ec2-mq)
+#
+# Levantar:   docker compose --env-file .env up -d
+# Estado:     docker compose ps
+# Cluster:    docker exec rabbitmq-1 rabbitmqctl cluster_status
+# UI nodo 1:  http://<IP>:15672   UI nodo 2: http://<IP>:15673
+# =====================================================================
+name: vidasalud-mq
+
+x-rabbitmq-common: &rabbitmq-common
+  image: rabbitmq:4.2-management
+  restart: unless-stopped
+  environment:
+    RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+    RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    # Misma cookie Erlang en ambos nodos: requisito para formar el cluster
+    VIDASALUD_ERLANG_COOKIE: ${RABBITMQ_ERLANG_COOKIE}
+  # Escribe la cookie compartida (como root) y luego inicia RabbitMQ con el
+  # entrypoint oficial, que baja a usuario rabbitmq con gosu
+  entrypoint:
+    - /bin/bash
+    - -c
+    - |
+      rm -f /var/lib/rabbitmq/.erlang.cookie
+      echo -n "$$VIDASALUD_ERLANG_COOKIE" > /var/lib/rabbitmq/.erlang.cookie
+      chown rabbitmq:rabbitmq /var/lib/rabbitmq/.erlang.cookie
+      chmod 400 /var/lib/rabbitmq/.erlang.cookie
+      exec docker-entrypoint.sh rabbitmq-server
+  healthcheck:
+    test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+    interval: 10s
+    timeout: 10s
+    retries: 10
+    start_period: 30s
+  networks:
+    - mq-net
+
+services:
+
+  rabbitmq-1:
+    <<: *rabbitmq-common
+    hostname: rabbitmq-1
+    container_name: rabbitmq-1
+    ports:
+      - "5672:5672"     # AMQP nodo 1
+      - "15672:15672"   # Management UI nodo 1
+    volumes:
+      - ./rabbitmq.conf:/etc/rabbitmq/conf.d/20-vidasalud.conf:ro
+      - rabbitmq1_data:/var/lib/rabbitmq
+
+  rabbitmq-2:
+    <<: *rabbitmq-common
+    hostname: rabbitmq-2
+    container_name: rabbitmq-2
+    depends_on:
+      rabbitmq-1:
+        condition: service_healthy
+    ports:
+      - "5673:5672"     # AMQP nodo 2
+      - "15673:15672"   # Management UI nodo 2
+    volumes:
+      - ./rabbitmq.conf:/etc/rabbitmq/conf.d/20-vidasalud.conf:ro
+      - rabbitmq2_data:/var/lib/rabbitmq
+
+volumes:
+  rabbitmq1_data:
+  rabbitmq2_data:
+
+networks:
+  mq-net:
+    name: vidasalud-mq-net
