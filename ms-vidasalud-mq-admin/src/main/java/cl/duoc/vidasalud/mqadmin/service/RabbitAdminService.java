@@ -152,9 +152,10 @@ public class RabbitAdminService {
         amqpAdmin.declareQueue(builder.build());
         log.info("[MQ-ADMIN] Cola creada {} (tipo={}, durable={})", name, request.typeOrDefault(), request.durableOrDefault());
 
+                final String effectiveDeadLetterKey = deadLetterKey;
         return findQueue(name).orElseGet(() -> new QueueResponse(
                 name, request.typeOrDefault(), request.durableOrDefault(), 0, 0, 0, 0, null,
-                request.deadLetterExchange(), deadLetterKey, false));
+                request.deadLetterExchange(), effectiveDeadLetterKey, false));
     }
 
     /**
