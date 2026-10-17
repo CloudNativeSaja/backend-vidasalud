@@ -1,4 +1,6 @@
-# VidaSalud - backend (BFF + appointments + catalog + MariaDB)
+# VidaSalud - backend (BFF + appointments + catalog + notify + mq-admin + MariaDB)
+# RabbitMQ NO esta aqui: corre en su propia EC2 (infra/mq/compose.yml). Este compose
+# solo necesita saber donde esta (RABBITMQ_ADDRESSES en .env).
 #
 #   cp .env.example .env     # y editar las contrasenas
 #   docker compose up -d --build
@@ -50,6 +52,10 @@ services:
       DB_USERNAME: ${DB_USERNAME}
       DB_PASSWORD: ${DB_PASSWORD}
       SPRING_JPA_SHOW_SQL: "false"
+      RABBITMQ_ADDRESSES: ${RABBITMQ_ADDRESSES:?Falta RABBITMQ_ADDRESSES en .env}
+      RABBITMQ_USER: ${RABBITMQ_USER:?Falta RABBITMQ_USER en .env}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?Falta RABBITMQ_PASSWORD en .env}
+      MESSAGING_ENABLED: ${MESSAGING_ENABLED:-true}
       TZ: America/Santiago
     ports:
       - "127.0.0.1:8081:8081"
@@ -57,7 +63,7 @@ services:
       mariadb:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8081/actuator/health"]
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8081/actuator/health/liveness"]
       interval: 15s
       timeout: 5s
       retries: 10
@@ -82,7 +88,52 @@ services:
       mariadb:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8082/actuator/health"]
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8082/actuator/health/liveness"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    mem_limit: 384m
+
+  notify:
+    <<: *java-service
+    build: ./ms-vidasalud-notify
+    image: vidasalud/notify:local
+    container_name: vidasalud-notify
+    environment:
+      NOTIFY_PORT: 8084
+      RABBITMQ_ADDRESSES: ${RABBITMQ_ADDRESSES}
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      # Fallos simulados para la demo (paciente con FALLA-TEMPORAL / FALLA-PERMANENTE)
+      NOTIFY_SIMULATION_ENABLED: ${NOTIFY_SIMULATION_ENABLED:-false}
+      TZ: America/Santiago
+    ports:
+      - "127.0.0.1:8084:8084"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8084/actuator/health/liveness"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    mem_limit: 384m
+
+  mq-admin:
+    <<: *java-service
+    build: ./ms-vidasalud-mq-admin
+    image: vidasalud/mq-admin:local
+    container_name: vidasalud-mq-admin
+    environment:
+      MQ_ADMIN_PORT: 8085
+      RABBITMQ_ADDRESSES: ${RABBITMQ_ADDRESSES}
+      RABBITMQ_USER: ${RABBITMQ_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      RABBITMQ_MANAGEMENT_URL: ${RABBITMQ_MANAGEMENT_URL:?Falta RABBITMQ_MANAGEMENT_URL en .env}
+      TZ: America/Santiago
+    ports:
+      - "127.0.0.1:8085:8085"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8085/actuator/health/liveness"]
       interval: 15s
       timeout: 5s
       retries: 10
@@ -100,6 +151,7 @@ services:
       AZURE_AUDIENCE: ${AZURE_AUDIENCE}
       APPOINTMENTS_URL: http://appointments:8081
       CATALOG_URL: http://catalog:8082
+      MQ_ADMIN_URL: http://mq-admin:8085
       TZ: America/Santiago
     ports:
       - "8080:8080"
@@ -109,7 +161,7 @@ services:
       catalog:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/actuator/health"]
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/actuator/health/liveness"]
       interval: 15s
       timeout: 5s
       retries: 10
