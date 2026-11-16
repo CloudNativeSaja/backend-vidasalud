@@ -1,0 +1,127 @@
+# =====================================================================
+# VidaSalud - Kafka en cluster (ec2-kafka)
+# 3 nodos ZooKeeper + 3 brokers + Kafka UI
+#
+# Levantar:  KAFKA_HOST=<IP publica EC2> docker compose up -d
+# Estado:    docker compose ps
+# Kafka UI:  http://<IP>:8080
+# =====================================================================
+name: vidasalud-kafka
+
+x-zookeeper: &zookeeper
+  image: confluentinc/cp-zookeeper:7.5.0
+  restart: unless-stopped
+  networks: [kafka-net]
+
+x-kafka: &kafka
+  image: confluentinc/cp-kafka:7.5.0
+  restart: unless-stopped
+  depends_on: [zookeeper-1, zookeeper-2, zookeeper-3]
+  networks: [kafka-net]
+
+x-kafka-env: &kafka-env
+  KAFKA_ZOOKEEPER_CONNECT: zookeeper-1:2181,zookeeper-2:2181,zookeeper-3:2181
+  KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+  KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+  # Tolerancia a fallos: 3 copias de cada particion, minimo 2 sincronizadas
+  KAFKA_DEFAULT_REPLICATION_FACTOR: 3
+  KAFKA_MIN_INSYNC_REPLICAS: 2
+  KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+  KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+  KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+  KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+  KAFKA_HEAP_OPTS: "-Xms256m -Xmx512m"
+
+services:
+
+  # ---------- ZooKeeper: coordina metadatos y eleccion del controller ----------
+  zookeeper-1:
+    <<: *zookeeper
+    hostname: zookeeper-1
+    environment: &zk-env
+      ZOOKEEPER_SERVER_ID: 1
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_INIT_LIMIT: 5
+      ZOOKEEPER_SYNC_LIMIT: 2
+      ZOOKEEPER_SERVERS: zookeeper-1:2888:3888;zookeeper-2:2888:3888;zookeeper-3:2888:3888
+
+  zookeeper-2:
+    <<: *zookeeper
+    hostname: zookeeper-2
+    environment:
+      <<: *zk-env
+      ZOOKEEPER_SERVER_ID: 2
+
+  zookeeper-3:
+    <<: *zookeeper
+    hostname: zookeeper-3
+    environment:
+      <<: *zk-env
+      ZOOKEEPER_SERVER_ID: 3
+
+  # ---------- Brokers: almacenan y replican las particiones ----------
+  kafka-1:
+    <<: *kafka
+    hostname: kafka-1
+    ports: ["9092:9092"]
+    environment:
+      <<: *kafka-env
+      KAFKA_BROKER_ID: 1
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-1:29092,PLAINTEXT_HOST://${KAFKA_HOST:-localhost}:9092
+
+  kafka-2:
+    <<: *kafka
+    hostname: kafka-2
+    ports: ["9093:9093"]
+    environment:
+      <<: *kafka-env
+      KAFKA_BROKER_ID: 2
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-2:29092,PLAINTEXT_HOST://${KAFKA_HOST:-localhost}:9093
+
+  kafka-3:
+    <<: *kafka
+    hostname: kafka-3
+    ports: ["9094:9094"]
+    environment:
+      <<: *kafka-env
+      KAFKA_BROKER_ID: 3
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9094
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-3:29092,PLAINTEXT_HOST://${KAFKA_HOST:-localhost}:9094
+
+  # ---------- Crea los 2 topicos (3 particiones x 3 replicas) y termina ----------
+  kafka-init:
+    image: confluentinc/cp-kafka:7.5.0
+    depends_on: [kafka-1, kafka-2, kafka-3]
+    networks: [kafka-net]
+    restart: "no"
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        BS=kafka-1:29092,kafka-2:29092,kafka-3:29092
+        until kafka-broker-api-versions --bootstrap-server $$BS >/dev/null 2>&1; do echo "esperando brokers..."; sleep 3; done
+        # Eventos de citas (creada / cambio de estado): los consume reportes (KPIs). Retencion 7 dias
+        kafka-topics --bootstrap-server $$BS --create --if-not-exists --topic vidasalud.appointments.events \
+          --partitions 3 --replication-factor 3 --config retention.ms=604800000 --config min.insync.replicas=2
+        # Eventos de auditoria: los consume ms-vidasalud-audit (timeline). Retencion 30 dias
+        kafka-topics --bootstrap-server $$BS --create --if-not-exists --topic vidasalud.audit.events \
+          --partitions 3 --replication-factor 3 --config retention.ms=2592000000 --config min.insync.replicas=2
+        kafka-topics --bootstrap-server $$BS --describe
+
+  # ---------- Kafka UI: administrar brokers, topicos, mensajes y consumer lag ----------
+  kafka-ui:
+    image: provectuslabs/kafka-ui:v0.7.2
+    restart: unless-stopped
+    depends_on: [kafka-1, kafka-2, kafka-3]
+    ports: ["8080:8080"]
+    networks: [kafka-net]
+    environment:
+      KAFKA_CLUSTERS_0_NAME: vidasalud
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka-1:29092,kafka-2:29092,kafka-3:29092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper-1:2181,zookeeper-2:2181,zookeeper-3:2181
+
+networks:
+  kafka-net:
+    name: vidasalud-kafka-net
