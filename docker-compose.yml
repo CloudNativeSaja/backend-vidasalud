@@ -56,6 +56,9 @@ services:
       RABBITMQ_USER: ${RABBITMQ_USER:?Falta RABBITMQ_USER en .env}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?Falta RABBITMQ_PASSWORD en .env}
       MESSAGING_ENABLED: ${MESSAGING_ENABLED:-true}
+      # Kafka (eventos de citas). Apagado por defecto: solo se activa cuando el clúster está arriba.
+      STREAMING_ENABLED: ${STREAMING_ENABLED:-false}
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-host.docker.internal:9092,host.docker.internal:9093,host.docker.internal:9094}
       TZ: America/Santiago
     ports:
       - "127.0.0.1:8081:8081"
