@@ -1,6 +1,10 @@
-# VidaSalud - backend (BFF + appointments + catalog + notify + mq-admin + MariaDB)
+# VidaSalud - backend (BFF + appointments + catalog + notify + mq-admin
+#                      + report + audit + kafka-admin + MariaDB)
 # RabbitMQ NO esta aqui: corre en su propia EC2 (infra/mq/compose.yml). Este compose
 # solo necesita saber donde esta (RABBITMQ_ADDRESSES en .env).
+# Kafka tampoco: es el cluster de infra/kafka/compose.yml (KAFKA_BOOTSTRAP_SERVERS en .env).
+# Con Kafka caido, appointments y el BFF funcionan igual; solo report, audit y
+# kafka-admin quedan sin datos.
 #
 #   cp .env.example .env     # y editar las contrasenas
 #   docker compose up -d --build
@@ -56,6 +60,9 @@ services:
       RABBITMQ_USER: ${RABBITMQ_USER:?Falta RABBITMQ_USER en .env}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?Falta RABBITMQ_PASSWORD en .env}
       MESSAGING_ENABLED: ${MESSAGING_ENABLED:-true}
+      # Kafka (eventos de citas). Apagado por defecto: solo se activa cuando el clúster está arriba.
+      STREAMING_ENABLED: ${STREAMING_ENABLED:-false}
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-host.docker.internal:9092,host.docker.internal:9093,host.docker.internal:9094}
       TZ: America/Santiago
     ports:
       - "127.0.0.1:8081:8081"
@@ -140,6 +147,68 @@ services:
       start_period: 60s
     mem_limit: 384m
 
+  report:
+    <<: *java-service
+    build: ./ms-vidasalud-report
+    image: vidasalud/report:local
+    container_name: vidasalud-report
+    environment:
+      REPORT_PORT: 8086
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-host.docker.internal:9092,host.docker.internal:9093,host.docker.internal:9094}
+      # Nombre de cada prestacion para el ranking
+      CATALOG_URL: http://catalog:8082
+      TZ: America/Santiago
+    ports:
+      - "127.0.0.1:8086:8086"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8086/actuator/health/liveness"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    mem_limit: 384m
+
+  audit:
+    <<: *java-service
+    build: ./ms-vidasalud-audit
+    image: vidasalud/audit:local
+    container_name: vidasalud-audit
+    environment:
+      AUDIT_PORT: 8087
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-host.docker.internal:9092,host.docker.internal:9093,host.docker.internal:9094}
+      KAFKA_REPLICATION_FACTOR: ${KAFKA_REPLICATION_FACTOR:-3}
+      KAFKA_MIN_INSYNC_REPLICAS: ${KAFKA_MIN_INSYNC_REPLICAS:-2}
+      TZ: America/Santiago
+    ports:
+      - "127.0.0.1:8087:8087"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8087/actuator/health/liveness"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    mem_limit: 384m
+
+  kafka-admin:
+    <<: *java-service
+    build: ./ms-vidasalud-kafka-admin
+    image: vidasalud/kafka-admin:local
+    container_name: vidasalud-kafka-admin
+    environment:
+      KAFKA_ADMIN_PORT: 8088
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-host.docker.internal:9092,host.docker.internal:9093,host.docker.internal:9094}
+      KAFKA_REPLICATION_FACTOR: ${KAFKA_REPLICATION_FACTOR:-3}
+      TZ: America/Santiago
+    ports:
+      - "127.0.0.1:8088:8088"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8088/actuator/health/liveness"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    mem_limit: 384m
+
   bff:
     <<: *java-service
     build: ./ms-vidasalud-bff
@@ -152,6 +221,9 @@ services:
       APPOINTMENTS_URL: http://appointments:8081
       CATALOG_URL: http://catalog:8082
       MQ_ADMIN_URL: http://mq-admin:8085
+      REPORT_URL: http://report:8086
+      AUDIT_URL: http://audit:8087
+      KAFKA_ADMIN_URL: http://kafka-admin:8088
       TZ: America/Santiago
     ports:
       - "8080:8080"

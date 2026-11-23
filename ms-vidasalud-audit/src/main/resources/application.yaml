@@ -1,0 +1,94 @@
+server:
+  port: ${AUDIT_PORT:8087}
+
+spring:
+  application:
+    name: ms-vidasalud-audit
+
+  # ---------------------------------------------------------------------
+  # Kafka: productor y consumidor del cluster de 3 brokers (ver infra/kafka)
+  # ---------------------------------------------------------------------
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092,localhost:9093,localhost:9094}
+    client-id: ms-vidasalud-audit
+
+    consumer:
+      # Grupo nuevo = lee desde el inicio y reconstruye la linea de tiempo
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      max-poll-records: 50
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      # Si el JSON viene corrupto no se cae el consumidor: el error va a la DLT
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      properties:
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JacksonJsonDeserializer
+        # Cada @KafkaListener indica su propio tipo con spring.json.value.default.type
+        spring.json.use.type.headers: false
+        spring.json.trusted.packages: cl.duoc.vidasalud.audit.event
+        partition.assignment.strategy: org.apache.kafka.clients.consumer.CooperativeStickyAssignor
+        session.timeout.ms: 15000
+        heartbeat.interval.ms: 3000
+        max.poll.interval.ms: 60000
+
+    # Productor de eventos de auditoria (y de la DLT)
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JacksonJsonSerializer
+      acks: all
+      retries: 3
+      compression-type: lz4
+      properties:
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 5
+        linger.ms: 5
+        delivery.timeout.ms: 10000
+        request.timeout.ms: 3000
+        spring.json.add.type.headers: false
+
+    # Si Kafka no esta disponible, el servicio igual arranca rapido (no espera 30 s)
+    admin:
+      fail-fast: false
+      operation-timeout: 5s
+      properties:
+        default.api.timeout.ms: 5000
+        request.timeout.ms: 3000
+
+    listener:
+      ack-mode: record
+      concurrency: 3
+      missing-topics-fatal: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+# =====================================================================
+# Configuracion centralizada de Kafka (unica fuente de nombres)
+# =====================================================================
+vidasalud:
+  kafka:
+    topics:
+      appointments-events: vidasalud.appointments.events
+      audit-events: vidasalud.audit.events
+    groups:
+      auditoria: auditoria
+      timeline: auditoria-timeline
+    # Parametros del topico de auditoria (este servicio es su productor)
+    audit-topic:
+      partitions: 3
+      replication-factor: ${KAFKA_REPLICATION_FACTOR:3}
+      retention: 30d
+      min-insync-replicas: ${KAFKA_MIN_INSYNC_REPLICAS:2}
+    dead-letter:
+      appointments-topic: vidasalud.appointments.events.auditoria.DLT
+      audit-topic: vidasalud.audit.events.auditoria-timeline.DLT
+      partitions: 3
+      replication-factor: ${KAFKA_REPLICATION_FACTOR:3}
+      retention: 14d
+    retry:
+      max-retries: 3
+      initial-interval: 1s
+      multiplier: 2.0
+      max-interval: 10s

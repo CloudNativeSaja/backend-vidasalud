@@ -1,0 +1,90 @@
+server:
+  port: ${REPORT_PORT:8086}
+
+spring:
+  application:
+    name: ms-vidasalud-report
+
+  # ---------------------------------------------------------------------
+  # Kafka: consumidor del cluster de 3 brokers (ver infra/kafka)
+  # ---------------------------------------------------------------------
+  kafka:
+    # Basta con alcanzar uno de los brokers: el cliente descubre el resto.
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092,localhost:9093,localhost:9094}
+    client-id: ms-vidasalud-report
+
+    consumer:
+      # Consumer group propio: lee todos los eventos sin competir con auditoria
+      group-id: ${KAFKA_GROUP_ID:reportes}
+      # Grupo nuevo = lee desde el inicio y reconstruye los KPIs
+      auto-offset-reset: earliest
+      # El contenedor confirma el offset despues de procesar cada evento
+      enable-auto-commit: false
+      max-poll-records: 50
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      # Si el JSON viene corrupto no se cae el consumidor: el error va a la DLT
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      properties:
+        spring.deserializer.value.delegate.class: org.springframework.kafka.support.serializer.JacksonJsonDeserializer
+        spring.json.value.default.type: cl.duoc.vidasalud.report.event.AppointmentEvent
+        spring.json.use.type.headers: false
+        spring.json.trusted.packages: cl.duoc.vidasalud.report.event
+        # Rebalanceo incremental: al entrar o salir una instancia no se detiene todo el grupo
+        partition.assignment.strategy: org.apache.kafka.clients.consumer.CooperativeStickyAssignor
+        session.timeout.ms: 15000
+        heartbeat.interval.ms: 3000
+        max.poll.interval.ms: 60000
+
+    # Productor solo para publicar en la DLT
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JacksonJsonSerializer
+      acks: all
+      properties:
+        enable.idempotence: true
+        spring.json.add.type.headers: false
+
+    # Si Kafka no esta disponible, el servicio igual arranca rapido (no espera 30 s)
+    admin:
+      fail-fast: false
+      operation-timeout: 5s
+      properties:
+        default.api.timeout.ms: 5000
+        request.timeout.ms: 3000
+
+    listener:
+      # Confirmacion por registro: un fallo no reprocesa eventos ya aplicados
+      ack-mode: record
+      # Un hilo por particion (el topico tiene 3)
+      concurrency: 3
+      # Si el broker aun no tiene el topico, el servicio igual arranca
+      missing-topics-fatal: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+# =====================================================================
+# Configuracion centralizada de Kafka (unica fuente de nombres)
+# =====================================================================
+vidasalud:
+  kafka:
+    topics:
+      appointments-events: vidasalud.appointments.events
+    # Mensajes que no se pudieron procesar (uno por consumer group)
+    dead-letter:
+      topic: vidasalud.appointments.events.reportes.DLT
+      partitions: 3
+      replication-factor: ${KAFKA_REPLICATION_FACTOR:3}
+      retention: 14d
+    retry:
+      max-retries: 3
+      initial-interval: 1s
+      multiplier: 2.0
+      max-interval: 10s
+
+  # Para mostrar el nombre de cada prestacion en el ranking
+  catalog:
+    url: ${CATALOG_URL:http://127.0.0.1:8082}
