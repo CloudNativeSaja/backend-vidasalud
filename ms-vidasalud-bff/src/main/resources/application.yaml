@@ -25,3 +25,15 @@ services:
   # Microservicio administrador de RabbitMQ (solo rol ADMIN)
   mq-admin:
     url: ${MQ_ADMIN_URL:http://127.0.0.1:8085}
+
+  # Indicadores calculados desde Kafka (solo rol ADMIN)
+  report:
+    url: ${REPORT_URL:http://127.0.0.1:8086}
+
+  # Linea de tiempo de auditoria desde Kafka (roles ADMIN y AUDITOR)
+  audit:
+    url: ${AUDIT_URL:http://127.0.0.1:8087}
+
+  # Microservicio administrador de Kafka (solo rol ADMIN)
+  kafka-admin:
+    url: ${KAFKA_ADMIN_URL:http://127.0.0.1:8088}
