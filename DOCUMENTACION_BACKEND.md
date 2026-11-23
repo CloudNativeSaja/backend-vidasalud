@@ -54,20 +54,20 @@ CREATE DATABASE vidasalud_catalog;
 
 ### 4.2 Iniciar los servicios
 
-Ejecutar cada comando desde la carpeta del modulo correspondiente:
+Cada microservicio vive en su propio repositorio. Clonarlos con `deploy\servicios.ps1` (quedan en `servicios\`) y ejecutar cada comando desde la carpeta del microservicio:
 
 ```powershell
-cd vidaSaludBack\ms-vidasalud-appointments
+cd servicios\ms-vidasalud-appointments
 .\mvnw.cmd spring-boot:run
 ```
 
 ```powershell
-cd vidaSaludBack\ms-vidasalud-catalog
+cd servicios\ms-vidasalud-catalog
 .\mvnw.cmd spring-boot:run
 ```
 
 ```powershell
-cd vidaSaludBack\ms-vidasalud-bff
+cd servicios\ms-vidasalud-bff
 .\mvnw.cmd spring-boot:run
 ```
 
@@ -401,7 +401,7 @@ src/main/java/cl/duoc/vidasalud/<modulo>/
 - Agregar pruebas de endpoints, reglas de transicion y reserva/liberacion de cupos; las pruebas actuales son principalmente de carga del contexto.
 - Evaluar manejo centralizado de errores y timeouts para las llamadas del BFF a los servicios internos.
 
-## 14. Archivos de configuracion principales
+## 14. Archivos de configuracion principales (en el repositorio de cada microservicio)
 
 - `ms-vidasalud-bff/src/main/resources/application.yaml`
 - `ms-vidasalud-appointments/src/main/resources/application.yaml`

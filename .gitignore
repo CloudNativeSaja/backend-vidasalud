@@ -17,3 +17,5 @@ Thumbs.db
 # Logs
 *.log
 logs/
+# Microservicios clonados por deploy/servicios.sh (cada uno es su propio repositorio)
+servicios/

@@ -1,11 +1,13 @@
 #!/bin/bash
 # Redespliega el backend en la EC2:  ./deploy/deploy.sh
+# (este repo solo trae infraestructura; los servicios se bajan con deploy/servicios.sh)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 [ -f .env ] || { echo "Falta .env (cp .env.example .env y editar)"; exit 1; }
 
 git pull --ff-only
+./deploy/servicios.sh        # clona o actualiza los 8 microservicios (un repo cada uno)
 docker compose up -d --build
 docker image prune -f >/dev/null
 

@@ -45,7 +45,9 @@ Se crean con `infra/kafka/compose.yml` (contenedor `kafka-init`); `audit` declar
 
 - **`reportes`** y **`auditoria`** leen el mismo tópico de citas de forma independiente: cada uno tiene sus propios offsets.
 - Dentro de un grupo, Kafka reparte las particiones entre las instancias (`concurrency: 3` = un hilo por partición). Si se levanta una segunda instancia del servicio con el mismo grupo, se reparten la carga; si una cae, la otra toma sus particiones (`CooperativeStickyAssignor`, rebalanceo incremental).
-- `auto.offset.reset=earliest`: un grupo nuevo, o tras reiniciar sin estado, **relee el log desde el principio** y reconstruye KPIs y línea de tiempo. Por eso no hace falta base de datos.
+- **El estado vive en memoria y se reconstruye releyendo el log.** `report` (grupo `reportes`) y la línea de tiempo de `audit` (grupo `auditoria-timeline`) hacen *seek al inicio* cada vez que se les asignan particiones (`AbstractConsumerSeekAware`): tras reiniciar el servicio, o si Kafka reasigna particiones, releen el tópico y los KPIs y la auditoría vuelven a estar completos. Por eso no hace falta base de datos. Repetir eventos es seguro: ambos descartan duplicados por `eventId`.
+- El grupo `auditoria` (que **publica** en Kafka) no relee al reiniciar: continúa desde su último offset, para no duplicar eventos de auditoría.
+- Límite conocido: con varias instancias del mismo servicio, cada una conoce solo las particiones que le tocaron. Para esta entrega corre una instancia de cada uno.
 
 ## Manejo de errores
 
@@ -85,8 +87,9 @@ $env:KAFKA_HOST = "host.docker.internal"
 docker compose up -d
 docker compose ps          # todo en estado running; kafka-init termina solo (Exited 0)
 
-# 2. Backend con Kafka activado
+# 2. Backend con Kafka activado. Los microservicios son repos aparte: se clonan en .\servicios
 cd ..\..
+.\deploy\servicios.ps1
 #    en .env: STREAMING_ENABLED=true  (KAFKA_BOOTSTRAP_SERVERS ya apunta a host.docker.internal)
 docker compose up -d --build
 docker compose ps          # todo healthy

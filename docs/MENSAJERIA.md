@@ -166,13 +166,13 @@ docker compose ps
 docker exec rabbitmq-1 rabbitmqctl cluster_status
 ```
 
-La UI queda en http://localhost:15672 (usuario y clave del `.env`). Después se levantan los servicios, cada uno en su terminal:
+La UI queda en http://localhost:15672 (usuario y clave del `.env`). Después se levantan los servicios (clonados con `deploy\servicios.ps1` en `servicios\`), cada uno en su terminal:
 
 ```powershell
 $env:RABBITMQ_USER="vidasalud"; $env:RABBITMQ_PASSWORD="<clave del .env>"
-cd ms-vidasalud-notify;       .\mvnw.cmd spring-boot:run
-cd ms-vidasalud-mq-admin;     .\mvnw.cmd spring-boot:run
-cd ms-vidasalud-appointments; .\mvnw.cmd spring-boot:run
+cd servicios\ms-vidasalud-notify;       .\mvnw.cmd spring-boot:run
+cd servicios\ms-vidasalud-mq-admin;     .\mvnw.cmd spring-boot:run
+cd servicios\ms-vidasalud-appointments; .\mvnw.cmd spring-boot:run
 ```
 
 ### 6.2 AWS EC2 (`ec2-mq`)

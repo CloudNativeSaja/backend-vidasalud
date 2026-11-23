@@ -7,6 +7,7 @@
 # kafka-admin quedan sin datos.
 #
 #   cp .env.example .env     # y editar las contrasenas
+#   ./deploy/servicios.sh    # clona los microservicios en ./servicios (un repo cada uno)
 #   docker compose up -d --build
 #   docker compose ps
 #
@@ -47,7 +48,7 @@ services:
 
   appointments:
     <<: *java-service
-    build: ./ms-vidasalud-appointments
+    build: ./servicios/ms-vidasalud-appointments
     image: vidasalud/appointments:local
     container_name: vidasalud-appointments
     environment:
@@ -79,7 +80,7 @@ services:
 
   catalog:
     <<: *java-service
-    build: ./ms-vidasalud-catalog
+    build: ./servicios/ms-vidasalud-catalog
     image: vidasalud/catalog:local
     container_name: vidasalud-catalog
     environment:
@@ -104,7 +105,7 @@ services:
 
   notify:
     <<: *java-service
-    build: ./ms-vidasalud-notify
+    build: ./servicios/ms-vidasalud-notify
     image: vidasalud/notify:local
     container_name: vidasalud-notify
     environment:
@@ -127,7 +128,7 @@ services:
 
   mq-admin:
     <<: *java-service
-    build: ./ms-vidasalud-mq-admin
+    build: ./servicios/ms-vidasalud-mq-admin
     image: vidasalud/mq-admin:local
     container_name: vidasalud-mq-admin
     environment:
@@ -149,7 +150,7 @@ services:
 
   report:
     <<: *java-service
-    build: ./ms-vidasalud-report
+    build: ./servicios/ms-vidasalud-report
     image: vidasalud/report:local
     container_name: vidasalud-report
     environment:
@@ -170,7 +171,7 @@ services:
 
   audit:
     <<: *java-service
-    build: ./ms-vidasalud-audit
+    build: ./servicios/ms-vidasalud-audit
     image: vidasalud/audit:local
     container_name: vidasalud-audit
     environment:
@@ -191,7 +192,7 @@ services:
 
   kafka-admin:
     <<: *java-service
-    build: ./ms-vidasalud-kafka-admin
+    build: ./servicios/ms-vidasalud-kafka-admin
     image: vidasalud/kafka-admin:local
     container_name: vidasalud-kafka-admin
     environment:
@@ -211,7 +212,7 @@ services:
 
   bff:
     <<: *java-service
-    build: ./ms-vidasalud-bff
+    build: ./servicios/ms-vidasalud-bff
     image: vidasalud/bff:local
     container_name: vidasalud-bff
     environment:
